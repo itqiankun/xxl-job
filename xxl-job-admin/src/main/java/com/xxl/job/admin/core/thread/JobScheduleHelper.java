@@ -1,5 +1,6 @@
 package com.xxl.job.admin.core.thread;
 
+import com.google.gson.Gson;
 import com.xxl.job.admin.core.conf.XxlJobAdminConfig;
 import com.xxl.job.admin.core.cron.CronExpression;
 import com.xxl.job.admin.core.model.XxlJobInfo;
@@ -81,7 +82,7 @@ public class JobScheduleHelper {
                         if (scheduleList!=null && scheduleList.size()>0) {
                             // 2、push time-ring
                             for (XxlJobInfo jobInfo: scheduleList) {
-
+                                logger.info("jobInfo.getTriggerNextTime():{},now:{}",jobInfo.getTriggerNextTime(), nowTime);
                                 // time-ring jump
                                 if (nowTime > jobInfo.getTriggerNextTime() + PRE_READ_MS) {
                                     // 2.1、trigger-expire > 5s：pass && make next-trigger-time
@@ -113,6 +114,7 @@ public class JobScheduleHelper {
 
                                         // 1、make ring second
                                         int ringSecond = (int)((jobInfo.getTriggerNextTime()/1000)%60);
+                                        logger.info("trigger preHandler ringSecond:{}, jobInfoId:{}", ringSecond, jobInfo.getId());
 
                                         // 2、push time ring
                                         pushTimeRing(ringSecond, jobInfo.getId());
@@ -194,7 +196,7 @@ public class JobScheduleHelper {
                     }
                     long cost = System.currentTimeMillis()-start;
 
-
+                    logger.info("cost 消费时间:{}",cost);
                     // Wait seconds, align second
                     if (cost < 1000) {  // scan-overtime, not wait
                         try {
@@ -236,9 +238,13 @@ public class JobScheduleHelper {
                     try {
                         // second data
                         List<Integer> ringItemData = new ArrayList<>();
-                        int nowSecond = Calendar.getInstance().get(Calendar.SECOND);   // 避免处理耗时太长，跨过刻度，向前校验一个刻度；
+                        int nowSecond = Calendar.getInstance().get(Calendar.SECOND);
+                        logger.info("ringThread nowSecond:{}", nowSecond);
                         for (int i = 0; i < 2; i++) {
-                            List<Integer> tmpData = ringData.remove( (nowSecond+60-i)%60 );
+                            // 避免处理耗时太长，跨过刻度，向前校验一个刻度
+                            int key = (nowSecond + 60 - i) % 60;
+                            logger.info("ringThread key:{}", key);
+                            List<Integer> tmpData = ringData.remove(key);
                             if (tmpData != null) {
                                 ringItemData.addAll(tmpData);
                             }
@@ -274,6 +280,7 @@ public class JobScheduleHelper {
         if (nextValidTime != null) {
             jobInfo.setTriggerLastTime(jobInfo.getTriggerNextTime());
             jobInfo.setTriggerNextTime(nextValidTime.getTime());
+//            logger.info("refreshNextValidTime()  nextValidTime:{}, jobInfoId:{}", nextValidTime, jobInfo.getId());
         } else {
             jobInfo.setTriggerStatus(0);
             jobInfo.setTriggerLastTime(0);
